@@ -149,17 +149,12 @@ public:
         return filter_helper(predicate, true, to_append);
     }
 
-
-
-
     template<typename Functor>
     T accumulate(Functor operation, T a, Order traversal) {
         auto res = a;
         accumulate_helper(operation, res, traversal);
         return res;
     }
-
-
 
     template<typename Functor>
     void apply(Functor operation, Order traversal) {
