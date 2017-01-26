@@ -9,8 +9,6 @@
 #include <queue>
 #include <cassert>
 
-using namespace std::placeholders;
-
 using Action = std::function<void()>;
 using Order = std::function<void(Action, Action, Action)>;
 
@@ -42,9 +40,6 @@ private:
 
     template<typename Functor>
     Tree<T> filter_helper(Functor predicate, bool can_be_rightmost, std::queue<Tree> &toAppend) {
-        auto filter_left = [&]() -> Tree<T> { return left().filter_helper(predicate, false, toAppend); };
-        auto filter_right = [&]() -> Tree<T> { return right().filter_helper(predicate, can_be_rightmost, toAppend); };
-
         if (empty()) {
             if (toAppend.empty() || !can_be_rightmost) {
                 return Tree();
@@ -55,17 +50,17 @@ private:
         }
 
         if (predicate(value())) {
-            auto left_filtered = filter_left();
-            auto right_filtered = filter_right();
+            auto left_filtered = left().filter_helper(predicate, false, toAppend);
+            auto right_filtered = right().filter_helper(predicate, can_be_rightmost, toAppend);
             return createValueNode(value(), left_filtered, right_filtered);
         }
 
         if (left().empty() && !right().empty()) {
-            return filter_right();
+            return right().filter_helper(predicate, can_be_rightmost, toAppend);
         }
 
         if (!left().empty() && right().empty()) {
-            return filter_left();
+            return left().filter_helper(predicate, false, toAppend);
         }
 
         if (left().empty() && right().empty()) {
@@ -87,15 +82,13 @@ private:
         traversal(nodeFun, leftFun, rightFun);
     }
 public:
-    Tree(NodePtr root) : m_root(std::move(root)) {}
-
     Tree() = default;
 
-    Tree(Tree &&) = default;
-
-    Tree(Tree const &) = default;
+    Tree(NodePtr root) : m_root(std::move(root)) {}
 
     Tree(T value, Tree left, Tree right);
+
+    Tree(Tree const &) = default;
 
     static Order inorder, preorder, postorder;
 
