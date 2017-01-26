@@ -2,9 +2,8 @@
 #define TREE_H
 
 #include <memory>
-#include <iosfwd>
+#include <iostream>
 #include <functional>
-#include <tuple>
 #include <limits>
 #include <queue>
 #include <cassert>
@@ -39,36 +38,36 @@ private:
     }
 
     template<typename Functor>
-    Tree<T> filter_helper(Functor predicate, bool can_be_rightmost, std::queue<Tree> &toAppend) {
+    Tree<T> filter_helper(Functor predicate, bool can_be_rightmost, std::queue<Tree> &append_queue) {
         if (empty()) {
-            if (toAppend.empty() || !can_be_rightmost) {
+            if (append_queue.empty() || !can_be_rightmost) {
                 return Tree();
             }
-            auto first = toAppend.front();
-            toAppend.pop();
-            return first.filter_helper(predicate, true, toAppend);
+            auto first = append_queue.front();
+            append_queue.pop();
+            return first.filter_helper(predicate, true, append_queue);
         }
 
         if (predicate(value())) {
-            auto left_filtered = left().filter_helper(predicate, false, toAppend);
-            auto right_filtered = right().filter_helper(predicate, can_be_rightmost, toAppend);
+            auto left_filtered = left().filter_helper(predicate, false, append_queue);
+            auto right_filtered = right().filter_helper(predicate, can_be_rightmost, append_queue);
             return createValueNode(value(), left_filtered, right_filtered);
         }
 
         if (left().empty() && !right().empty()) {
-            return right().filter_helper(predicate, can_be_rightmost, toAppend);
+            return right().filter_helper(predicate, can_be_rightmost, append_queue);
         }
 
         if (!left().empty() && right().empty()) {
-            return left().filter_helper(predicate, false, toAppend);
+            return left().filter_helper(predicate, false, append_queue);
         }
 
         if (left().empty() && right().empty()) {
             return Tree();
         }
 
-        toAppend.push(right());
-        return left().filter_helper(predicate, can_be_rightmost, toAppend);
+        append_queue.push(right());
+        return left().filter_helper(predicate, can_be_rightmost, append_queue);
     }
 
     template<typename Functor>
@@ -81,14 +80,23 @@ private:
         auto rightFun = [&] { right().accumulate_helper(operation, a, traversal); };
         traversal(nodeFun, leftFun, rightFun);
     }
+
+    static T min(T a, T b, T c) {
+       return std::min(std::min(a,b),c);
+    }
+
+    static T max(T a, T b, T c) {
+        return std::max(std::max(a,b),c);
+    }
+
 public:
     Tree() = default;
 
     Tree(NodePtr root) : m_root(std::move(root)) {}
 
-    Tree(T value, Tree left, Tree right);
+    Tree(const Tree &t) = default; //not implemented
 
-    Tree(Tree const &) = default;
+    Tree(Tree &&) = default;
 
     static Order inorder, preorder, postorder;
 
@@ -171,20 +179,19 @@ public:
     }
 
     bool is_bst() {
-        using resType = std::tuple<bool, T, T>;
-        auto fun = [](T v, resType l, resType r) -> resType {
-            bool l_is_bst = std::get<0>(l);
-            auto l_min = std::get<1>(l);
-            auto l_max = std::get<2>(l);
-            auto r_is_bst = std::get<0>(r);
-            auto r_min = std::get<1>(r);
-            auto r_max = std::get<2>(r);
-            auto is_bst = l_is_bst && r_is_bst && l_max <= v && v <= r_min;
-            return std::make_tuple(is_bst, l_min, r_max);
+        using BstAcc = struct BstAcc {
+            BstAcc(T min, T max, bool is_bst) : min(min), max(max), is_bst(is_bst) {};
+            T min;
+            T max;
+            bool is_bst;
         };
-        auto result = fold<resType>(fun, std::make_tuple(true, std::numeric_limits<T>::max(),
-                                                         std::numeric_limits<T>::min()));
-        return std::get<1>(result);
+        auto fun = [](T v, BstAcc l, BstAcc r) -> BstAcc {
+            auto is_bst = l.is_bst && r.is_bst && l.max <= v && v <= r.min;
+            return BstAcc(min(l.min, r.min, v), max(l.max, r.max, v), is_bst);
+        };
+        auto result = fold(fun, BstAcc(std::numeric_limits<T>::max(),
+                                       std::numeric_limits<T>::min(), true));
+        return result.is_bst;
     }
 
     bool print(Order traversal = inorder) {
@@ -215,7 +222,7 @@ Order Tree<T>::postorder = [](Action node, Action left, Action right) -> void {
 };
 
 template<typename T>
-struct Tree<T>:: Node {
+struct Tree<T>::Node {
     NodePtr m_left;
     NodePtr m_right;
 
@@ -225,7 +232,7 @@ struct Tree<T>:: Node {
             m_right(std::move(right)) {}
 
     Node(std::function<T()> value_creator, NodePtr left, NodePtr right) :
-            m_value_creator(value_creator),
+            m_value_creator(std::move(value_creator)),
             m_left(std::move(left)),
             m_right(std::move(right)) {}
 
@@ -240,6 +247,7 @@ struct Tree<T>:: Node {
         }
         return m_value;
     }
+
 private:
     bool m_value_created = false;
     std::function<T()> m_value_creator;
