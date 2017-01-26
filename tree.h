@@ -82,11 +82,11 @@ private:
     }
 
     static T min(T a, T b, T c) {
-       return std::min(std::min(a,b),c);
+        return std::min(std::min(a, b), c);
     }
 
     static T max(T a, T b, T c) {
-        return std::max(std::max(a,b),c);
+        return std::max(std::max(a, b), c);
     }
 
 public:
@@ -94,7 +94,7 @@ public:
 
     Tree(NodePtr root) : m_root(std::move(root)) {}
 
-    Tree(const Tree &t) = default; //not implemented
+    Tree(const Tree &t) = default; //deep copy not implemented
 
     Tree(Tree &&) = default;
 
@@ -194,7 +194,7 @@ public:
         return result.is_bst;
     }
 
-    bool print(Order traversal = inorder) {
+    void print(Order traversal = inorder) {
         apply([](int e) { std::cout << e << " "; }, traversal);
         std::cout << std::endl;
     }
@@ -227,18 +227,33 @@ struct Tree<T>::Node {
     NodePtr m_right;
 
     Node(T value, NodePtr left, NodePtr right) :
-            m_value(value),
             m_left(std::move(left)),
-            m_right(std::move(right)) {}
+            m_right(std::move(right)),
+            m_value_created{},
+            m_value_creator{},
+            m_value(value) {}
 
     Node(std::function<T()> value_creator, NodePtr left, NodePtr right) :
-            m_value_creator(std::move(value_creator)),
             m_left(std::move(left)),
-            m_right(std::move(right)) {}
+            m_right(std::move(right)),
+            m_value_created{},
+            m_value_creator{value_creator},
+            m_value{} {}
 
-    Node() : m_left{}, m_right{} {}
+    Node() :
+            m_left(),
+            m_right(),
+            m_value_created{},
+            m_value_creator{},
+            m_value{} {}
 
-    Node(T value) : m_value(value) {}
+    Node(T value) :
+
+            m_left(),
+            m_right(),
+            m_value_created{},
+            m_value_creator{},
+            m_value{value} {}
 
     T get_value() {
         if (m_value_creator != nullptr && !m_value_created) {
@@ -252,6 +267,7 @@ private:
     bool m_value_created = false;
     std::function<T()> m_value_creator;
     T m_value;
+
 };
 
 #endif /* TREE_H */
